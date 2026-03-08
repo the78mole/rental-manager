@@ -33,6 +33,7 @@ class UserRole(str, enum.Enum):
     LANDLORD = "LANDLORD"
     TENANT = "TENANT"
     ADMIN = "ADMIN"
+    CARETAKER = "CARETAKER"
 
 
 class AdminRole(str, enum.Enum):
@@ -118,6 +119,16 @@ class User(Base):
     meter_readings = relationship("MeterReading", back_populates="uploaded_by")
     landlord_profile = relationship("LandlordProfile", back_populates="user", uselist=False, cascade="all, delete-orphan")
     landlord_documents = relationship("LandlordDocument", back_populates="landlord", cascade="all, delete-orphan")
+    caretaker_building_assignments = relationship(
+        "CaretakerBuildingAssignment",
+        back_populates="caretaker",
+        cascade="all, delete-orphan",
+    )
+    caretaker_apartment_assignments = relationship(
+        "CaretakerApartmentAssignment",
+        back_populates="caretaker",
+        cascade="all, delete-orphan",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -225,6 +236,11 @@ class Property(Base):
 
     landlord = relationship("User", back_populates="owned_properties")
     units = relationship("Unit", back_populates="property", cascade="all, delete-orphan")
+    caretaker_assignments = relationship(
+        "CaretakerBuildingAssignment",
+        back_populates="building",
+        cascade="all, delete-orphan",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -249,6 +265,37 @@ class Unit(Base):
     property = relationship("Property", back_populates="units")
     contracts = relationship("Contract", back_populates="unit")
     meters = relationship("Meter", back_populates="unit", cascade="all, delete-orphan")
+    caretaker_assignments = relationship(
+        "CaretakerApartmentAssignment",
+        back_populates="apartment",
+        cascade="all, delete-orphan",
+    )
+
+
+class CaretakerBuildingAssignment(Base):
+    __tablename__ = "caretaker_building_assignments"
+    __table_args__ = (UniqueConstraint("caretaker_id", "building_id"),)
+
+    id = Column(UUID(as_uuid=False), primary_key=True, default=_uuid)
+    caretaker_id = Column(UUID(as_uuid=False), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    building_id = Column(UUID(as_uuid=False), ForeignKey("properties.id", ondelete="CASCADE"), nullable=False, index=True)
+    assigned_at = Column(DateTime(timezone=True), default=_now, nullable=False)
+
+    caretaker = relationship("User", back_populates="caretaker_building_assignments")
+    building = relationship("Property", back_populates="caretaker_assignments")
+
+
+class CaretakerApartmentAssignment(Base):
+    __tablename__ = "caretaker_apartment_assignments"
+    __table_args__ = (UniqueConstraint("caretaker_id", "apartment_id"),)
+
+    id = Column(UUID(as_uuid=False), primary_key=True, default=_uuid)
+    caretaker_id = Column(UUID(as_uuid=False), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    apartment_id = Column(UUID(as_uuid=False), ForeignKey("units.id", ondelete="CASCADE"), nullable=False, index=True)
+    assigned_at = Column(DateTime(timezone=True), default=_now, nullable=False)
+
+    caretaker = relationship("User", back_populates="caretaker_apartment_assignments")
+    apartment = relationship("Unit", back_populates="caretaker_assignments")
 
 
 # ---------------------------------------------------------------------------

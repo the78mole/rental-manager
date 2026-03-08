@@ -10,6 +10,8 @@ from app.api.v1 import api_router
 from app.core.config import settings
 from app.core.database import engine
 from app.models.models import (  # noqa: F401 - ensure all models are imported before create_all
+    CaretakerApartmentAssignment,
+    CaretakerBuildingAssignment,
     BillLineItem,
     Contract,
     InterpolatedReading,

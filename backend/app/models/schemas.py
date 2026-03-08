@@ -7,6 +7,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.models import (
+    AdminRole,
     ContractStatus,
     HeatingType,
     MeterType,
@@ -66,6 +67,11 @@ class LandlordCreate(BaseModel):
     full_name: str
 
 
+class CaretakerCreate(BaseModel):
+    email: str
+    full_name: str
+
+
 class LandlordUpdate(BaseModel):
     full_name: str | None = None
     is_active: bool | None = None
@@ -78,6 +84,11 @@ class LandlordProvisionResponse(UserRead):
     set in Keycloak.  The password is only returned once and never stored.
     """
 
+    keycloak_created: bool = False
+    temp_password: str | None = None
+
+
+class CaretakerProvisionResponse(UserRead):
     keycloak_created: bool = False
     temp_password: str | None = None
 
@@ -191,6 +202,18 @@ class PropertyRead(OrmModel):
     created_at: datetime
 
 
+class BuildingCreate(PropertyCreate):
+    pass
+
+
+class BuildingUpdate(PropertyUpdate):
+    pass
+
+
+class BuildingRead(PropertyRead):
+    pass
+
+
 # ---------------------------------------------------------------------------
 # Unit (Mieteinheit)
 # ---------------------------------------------------------------------------
@@ -223,6 +246,24 @@ class UnitRead(OrmModel):
     heating_type: HeatingType
     is_occupied: bool
     created_at: datetime
+
+
+class ApartmentCreate(UnitCreate):
+    pass
+
+
+class ApartmentUpdate(UnitUpdate):
+    pass
+
+
+class ApartmentRead(UnitRead):
+    pass
+
+
+class CaretakerAssignmentRead(OrmModel):
+    id: str
+    caretaker_id: str
+    assigned_at: datetime
 
 
 # ---------------------------------------------------------------------------

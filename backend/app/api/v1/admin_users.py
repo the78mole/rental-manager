@@ -2,14 +2,14 @@
 
 Hierarchy:
 - SUPER_ADMIN: can manage all admin users (super-admins, admins, operators)
-- ADMIN: can manage operators (and update themselves)
+- ADMIN: can manage admins and operators (but not super-admins)
 - OPERATOR: read-only access to own profile; landlord management only
 
 Route protection matrix:
   GET  /admin-users           → ADMIN, SUPER_ADMIN
-  POST /admin-users           → SUPER_ADMIN (create any); ADMIN (create OPERATOR)
+    POST /admin-users           → SUPER_ADMIN (create any); ADMIN (create ADMIN/OPERATOR)
   GET  /admin-users/{id}      → ADMIN, SUPER_ADMIN (+ self)
-  PATCH /admin-users/{id}     → SUPER_ADMIN (any); ADMIN (operators only)
+    PATCH /admin-users/{id}     → SUPER_ADMIN (any); ADMIN (admins/operators)
   DELETE /admin-users/{id}    → SUPER_ADMIN only
 """
 
@@ -48,7 +48,7 @@ def _can_manage(actor: User, target_role: AdminRole) -> bool:
     """Return True if *actor* is allowed to manage a user with *target_role*."""
     if actor.admin_role == AdminRole.SUPER_ADMIN:
         return True
-    if actor.admin_role == AdminRole.ADMIN and target_role == AdminRole.OPERATOR:
+    if actor.admin_role == AdminRole.ADMIN and target_role in (AdminRole.ADMIN, AdminRole.OPERATOR):
         return True
     return False
 

@@ -137,6 +137,8 @@ def extract_user_info(claims: dict[str, Any]) -> dict[str, str]:
         role = "ADMIN"
     elif "landlord" in realm_roles:
         role = "LANDLORD"
+    elif "caretaker" in realm_roles:
+        role = "CARETAKER"
     elif "tenant" in realm_roles:
         role = "TENANT"
     else:

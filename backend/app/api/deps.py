@@ -46,6 +46,12 @@ async def get_current_user(
 
     info = extract_user_info(claims)
     keycloak_sub: str = info["sub"]
+    if not keycloak_sub:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token claims: missing subject",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
     # Look up by Keycloak sub (stored in User.id)
     result = await db.execute(select(User).where(User.id == keycloak_sub))
@@ -88,6 +94,12 @@ async def get_current_user(
 async def require_landlord(current_user: User = Depends(get_current_user)) -> User:
     if current_user.role not in (UserRole.LANDLORD, UserRole.ADMIN):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Landlord access required")
+    return current_user
+
+
+async def require_landlord_or_caretaker(current_user: User = Depends(get_current_user)) -> User:
+    if current_user.role not in (UserRole.LANDLORD, UserRole.CARETAKER, UserRole.ADMIN):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Landlord or caretaker access required")
     return current_user
 
 

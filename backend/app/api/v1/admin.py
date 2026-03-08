@@ -18,9 +18,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.api.deps import get_db, require_admin
+from app.api.deps import get_db, require_admin, require_admin_manager
 from app.models.models import LandlordDocument, LandlordProfile, Tag, User, UserRole
 from app.models.schemas import (
+    CaretakerCreate,
+    CaretakerProvisionResponse,
     LandlordCreate,
     LandlordDocumentRead,
     LandlordDocumentUpdate,
@@ -117,6 +119,77 @@ async def create_landlord(
 
     # ── 4. Build response (temp_password is returned exactly once) ─────────────
     return LandlordProvisionResponse(
+        id=user.id,
+        email=user.email,
+        full_name=user.full_name,
+        role=user.role,
+        is_active=user.is_active,
+        created_at=user.created_at,
+        keycloak_created=keycloak_created,
+        temp_password=temp_password,
+    )
+
+
+@router.get("/caretakers", response_model=list[UserRead])
+async def list_caretakers(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_admin),
+) -> list[User]:
+    result = await db.execute(
+        select(User)
+        .where(User.role == UserRole.CARETAKER)
+        .order_by(User.created_at)
+    )
+    return list(result.scalars().all())
+
+
+@router.post(
+    "/caretakers",
+    response_model=CaretakerProvisionResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_caretaker(
+    body: CaretakerCreate,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_admin),
+) -> CaretakerProvisionResponse:
+    existing = await db.execute(select(User).where(User.email == body.email))
+    if existing.scalar_one_or_none():
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"A user with email '{body.email}' already exists.",
+        )
+
+    keycloak_id: str | None = None
+    temp_password: str | None = None
+    keycloak_created = False
+
+    try:
+        keycloak_id, temp_password = await create_keycloak_user(body.email, body.full_name, realm_role="caretaker")
+        keycloak_created = True
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except (httpx.HTTPError, httpx.TimeoutException) as exc:
+        logger.warning("Keycloak account creation failed for %s: %s", body.email, exc)
+
+    user = User(
+        id=str(uuid.uuid4()),
+        email=body.email,
+        full_name=body.full_name,
+        hashed_password="",
+        role=UserRole.CARETAKER,
+        is_active=True,
+    )
+    db.add(user)
+    try:
+        await db.flush()
+        await db.refresh(user)
+    except Exception:
+        if keycloak_id:
+            await delete_keycloak_user(keycloak_id)
+        raise
+
+    return CaretakerProvisionResponse(
         id=user.id,
         email=user.email,
         full_name=user.full_name,
@@ -459,7 +532,7 @@ async def search_tags(
 @router.get("/stats", response_model=dict)
 async def get_stats(
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_admin),
+    _: User = Depends(require_admin_manager),
 ) -> dict:
     """Return platform-wide statistics."""
     from app.models.models import Contract, Property

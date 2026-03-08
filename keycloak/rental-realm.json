@@ -727,7 +727,6 @@
   ],
   "users": [
     {
-      "_comment": "DEVELOPMENT ONLY – change or delete these credentials before going to production",
       "username": "demo-landlord",
       "email": "landlord@example.com",
       "firstName": "Demo",
@@ -764,7 +763,6 @@
       ]
     },
     {
-      "_comment": "DEVELOPMENT ONLY – change credentials before going to production",
       "username": "platform-admin@example.com",
       "email": "platform-admin@example.com",
       "firstName": "Platform",
@@ -813,6 +811,27 @@
       {
         "name": "admin",
         "description": "Platform admin – manages landlords and system settings",
+        "composite": false,
+        "clientRole": false,
+        "containerId": "rental"
+      },
+      {
+        "name": "landlord",
+        "description": "Landlord role",
+        "composite": false,
+        "clientRole": false,
+        "containerId": "rental"
+      },
+      {
+        "name": "caretaker",
+        "description": "Caretaker role for assigned buildings/apartments",
+        "composite": false,
+        "clientRole": false,
+        "containerId": "rental"
+      },
+      {
+        "name": "tenant",
+        "description": "Tenant role",
         "composite": false,
         "clientRole": false,
         "containerId": "rental"
