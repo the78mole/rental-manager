@@ -1,192 +1,100 @@
-# Benutzerrollen & Mandantenstruktur
+# Benutzerrollen und Zugriffsmodell
 
 ## Überblick
 
-Der Rental Manager ist eine Mehrmandanten-Plattform (Multi-Tenant SaaS). Es gibt zwei
-grundlegend verschiedene Nutzergruppen:
+Der Rental Manager verwendet aktuell folgende fachliche Rollen:
 
-- **Plattform-Ebene**: Betreiber der Software
-- **Mandanten-Ebene**: Kunden der Plattform (Hausverwaltungen, private Vermieter, Hausmeisterdienste)
-- **Mieter-Ebene**: Endnutzer, die eine Wohneinheit gemietet haben
+- `ADMIN` (mit Subrollen `SUPER_ADMIN`, `ADMIN`, `OPERATOR`)
+- `LANDLORD`
+- `CARETAKER` (Hausverwalter)
+- `TENANT`
 
----
+Authentifizierung erfolgt ueber Keycloak (OIDC), die Autorisierung in der API ueber
+lokale Rollen und Subrollen.
 
-## Rollenübersicht
+## Rollenmodell
 
-| Rolle          | Keycloak-Rolle    | Ebene                           | Beschreibung                                                |
-| -------------- | ----------------- | ------------------------------- | ----------------------------------------------------------- |
-| Platform-Admin | `platform_admin`  | Plattform                       | Zugang zu allen Mandanten, System-Konfiguration             |
-| Mandant-Admin  | `mandant_admin`   | Mandant                         | Verwaltet seinen Mandanten und alle Benutzer darin          |
-| Manager        | `mandant_manager` | Mandant                         | Normaler Vermieter-Benutzer; verwaltet Objekte und Verträge |
-| Caretaker      | `caretaker`       | Mandant (mandantenübergreifend) | Hausmeister; lesen/schreiben in zugewiesenen Mandanten      |
-| Mieter         | `renter`          | Mieter                          | Sieht eigene Verträge, Zählerstände und Abrechnungen        |
+### 1. Plattform-Adminrolle (`ADMIN`)
 
----
+`ADMIN` ist die Plattformrolle und wird über `admin_role` differenziert:
 
-## Mandantenmodell
+- `SUPER_ADMIN`: darf alle Admin-Benutzer verwalten (`SUPER_ADMIN`, `ADMIN`, `OPERATOR`)
+- `ADMIN`: darf `ADMIN` und `OPERATOR` verwalten
+- `OPERATOR`: kein Admin-User-Management, Fokus auf Vermieter-/Mandantenverwaltung
 
-```mermaid
-erDiagram
-    Platform ||--o{ Mandant : betreibt
+### 2. Vermieterrolle (`LANDLORD`)
 
-    Mandant {
-        uuid id
-        string name
-        string type
-    }
-    Mandant ||--o{ MandantUser : hat
-    Mandant ||--o{ Property : besitzt
-    Mandant ||--o{ MandantAccess : gewährt
+- verwaltet eigene Gebaeude/Wohnungen
+- verwaltet Vertraege, Zaehler, Ablesungen, Abrechnungen im eigenen Bestand
+- kann Hausverwalter-Zuweisungen steuern
 
-    MandantUser {
-        uuid id
-        uuid mandant_id
-        uuid keycloak_sub
-        enum role
-    }
+### 3. Hausverwalterrolle (`CARETAKER`)
 
-    MandantAccess {
-        uuid id
-        uuid mandant_id
-        uuid grantee_mandant_id
-        enum access_level
-    }
+- arbeitet im Vermieter-Bereich (`/landlord/*`), aber nur auf zugewiesenen Objekten
+- darf keine globale Gebaeudestruktur aendern (z. B. keine neuen Gebaeude anlegen)
+- Zugriff wird ueber Zuweisung auf Gebaeude- oder Wohnungsebene erteilt
 
-    Property ||--o{ Unit : enthält
-    Unit ||--o{ Contract : hat
-    Unit ||--o{ Meter : hat
-    Contract }o--|| Renter : abgeschlossen_mit
-    Meter ||--o{ MeterReading : hat
+Anlage/Verwaltung von Hausverwaltern erfolgt ueber Admin-API:
 
-    Renter {
-        uuid id
-        string email
-        string full_name
-        uuid keycloak_sub
-    }
-```
+- `GET /admin/caretakers`
+- `POST /admin/caretakers`
 
----
+### 4. Mieterrolle (`TENANT`)
 
-## Rollenbeziehungen und Zugriffsrechte
+- sieht eigene Vertraege, eigene Abrechnungen und eigene Zaehlerdaten
+- kann eigene Zaehlerstaende erfassen
 
-```mermaid
-graph TD
-    PA[🔧 Platform Admin<br/><i>platform_admin</i>]
-    MA[👔 Mandant Admin<br/><i>mandant_admin</i>]
-    MM[🏢 Manager<br/><i>mandant_manager</i>]
-    CT[🔑 Caretaker<br/><i>caretaker</i>]
-    RN[🏠 Mieter<br/><i>renter</i>]
+## Objektstruktur: Gebaeude und Wohnungen
 
-    PA -->|verwaltet alle| MA
-    PA -->|sieht alle| Mandant1[Mandant A<br/>Hausverwaltung GmbH]
-    PA -->|sieht alle| Mandant2[Mandant B<br/>Privater Vermieter]
-    PA -->|sieht alle| Mandant3[Mandant C<br/>Hausmeisterservice]
+Die Datenstruktur ist zweistufig:
 
-    MA -->|verwaltet| Mandant1
-    MA -->|erstellt/löscht| MM
-    MA -->|erstellt/löscht| CT
+- `Building` fachlich = `Property` technisch
+- `Apartment` fachlich = `Unit` technisch
 
-    MM -->|verwaltet Objekte in| Mandant1
+Damit bleiben bestehende Endpunkte kompatibel und neue, semantische Endpunkte sind zusaetzlich verfuegbar.
 
-    Mandant3 -->|MandantAccess| Mandant1
-    Mandant3 -->|MandantAccess| Mandant2
-    CT -->|gehört zu| Mandant3
-    CT -->|eingeschränkter Zugang zu| Mandant1
-    CT -->|eingeschränkter Zugang zu| Mandant2
+### Endpunkt-Kompatibilitaet
 
-    RN -->|sieht eigene Daten in| Mandant1
-    RN -->|sieht eigene Daten in| Mandant2
+Bestehend:
 
-    style PA fill:#c0392b,color:#fff
-    style MA fill:#2980b9,color:#fff
-    style MM fill:#27ae60,color:#fff
-    style CT fill:#f39c12,color:#fff
-    style RN fill:#8e44ad,color:#fff
-```
+- `/landlord/properties`
+- `/landlord/properties/{property_id}/units`
 
----
+Neu (Alias):
 
-## Mandantentypen
+- `/landlord/buildings`
+- `/landlord/buildings/{building_id}/apartments`
 
-```mermaid
-graph LR
-    subgraph "Typ: Hausverwaltung (gewerblich)"
-        HV_Admin[Mandant Admin]
-        HV_Mgr1[Manager 1]
-        HV_Mgr2[Manager 2]
-        HV_Admin --> HV_Mgr1
-        HV_Admin --> HV_Mgr2
-    end
+## Mehrere Mieter pro Wohnung (WG / Einzelmietvertraege)
 
-    subgraph "Typ: Privater Vermieter"
-        PV_Admin[Mandant Admin<br/><i>einziger User</i>]
-    end
+Das System unterstuetzt mehrere Mieter in derselben Wohnung:
 
-    subgraph "Typ: Hausmeisterservice"
-        HS_Admin[Mandant Admin]
-        HS_CT1[Caretaker 1]
-        HS_CT2[Caretaker 2]
-        HS_Admin --> HS_CT1
-        HS_Admin --> HS_CT2
-    end
+- Jeder Vertrag referenziert `unit_id` (Wohnung) und `tenant_id` (Mieter)
+- Es gibt keine 1:1-Beschraenkung zwischen Wohnung und Mieter
+- Dadurch sind mehrere Einzelmietvertraege pro Wohnung moeglich (z. B. WG)
 
-    subgraph "Objekte anderer Mandanten"
-        Obj_A[Objekte Mandant A]
-        Obj_B[Objekte Mandant B]
-    end
+## Hausverwalter-Zuweisungsmodell
 
-    HS_CT1 -.->|MandantAccess| Obj_A
-    HS_CT2 -.->|MandantAccess| Obj_A
-    HS_CT2 -.->|MandantAccess| Obj_B
-```
+Hausverwalter koennen auf zwei Ebenen zugewiesen werden:
 
----
+- Gebaeudeweit: `caretaker_building_assignments`
+- Wohnungsbezogen: `caretaker_apartment_assignments`
 
-## MandantAccess: Hausmeisterservice-Sonderfall
+Verwaltungsendpunkte:
 
-Ein Hausmeisterservice ist ein eigenständiger Mandant (`Typ: SERVICE_PROVIDER`).
-Über die `MandantAccess`-Tabelle erhält er eingeschränkten Zugriff auf Objekte anderer Mandanten.
+- `POST /landlord/buildings/{building_id}/caretakers/{caretaker_id}`
+- `DELETE /landlord/buildings/{building_id}/caretakers/{caretaker_id}`
+- `POST /landlord/apartments/{apartment_id}/caretakers/{caretaker_id}`
+- `DELETE /landlord/apartments/{apartment_id}/caretakers/{caretaker_id}`
 
-```mermaid
-sequenceDiagram
-    participant HA as Hausmeister-<br/>Mandant Admin
-    participant PA as Platform Admin /<br/>Ziel-Mandant Admin
-    participant DB as Datenbank
+## Kurzmatrix (vereinfacht)
 
-    HA->>PA: Zugriffsanfrage für Mandant X
-    PA->>DB: INSERT MandantAccess(grantee=HS, target=X, level=READ_WRITE)
-    DB-->>PA: OK
-    PA-->>HA: Zugang gewährt
+| Aktion                                       | SUPER_ADMIN |                   ADMIN | OPERATOR |    LANDLORD |              CARETAKER |                  TENANT |
+| -------------------------------------------- | ----------: | ----------------------: | -------: | ----------: | ---------------------: | ----------------------: |
+| Admin-Benutzer verwalten                     |   ja (alle) | ja (`ADMIN`,`OPERATOR`) |     nein |        nein |                   nein |                    nein |
+| Vermieter verwalten                          |          ja |                      ja |       ja |        nein |                   nein |                    nein |
+| Gebaeude/Wohnungen strukturell aendern       |          ja |                      ja |       ja | ja (eigene) |                   nein |                    nein |
+| Zaehler/Ablesungen auf zugewiesenen Objekten |          ja |                      ja |       ja | ja (eigene) |        ja (zugewiesen) | eingeschraenkt (eigene) |
+| Eigene Vertrags-/Abrechnungsdaten sehen      |    optional |                optional | optional |          ja | teilweise (zugewiesen) |                      ja |
 
-    Note over HA,DB: Caretaker des HS-Mandanten<br/>sieht jetzt Objekte von Mandant X
-```
-
----
-
-## Zugriffsmatrix
-
-| Aktion                 | platform_admin | mandant_admin | mandant_manager | caretaker |   renter    |
-| ---------------------- | :------------: | :-----------: | :-------------: | :-------: | :---------: |
-| Mandanten verwalten    |       ✅       |      ❌       |       ❌        |    ❌     |     ❌      |
-| Mandant-User erstellen |       ✅       | ✅ (eigener)  |       ❌        |    ❌     |     ❌      |
-| MandantAccess vergeben |       ✅       | ✅ (eigener)  |       ❌        |    ❌     |     ❌      |
-| Immobilien verwalten   |       ✅       |      ✅       |       ✅        |  👁️ read  |     ❌      |
-| Verträge verwalten     |       ✅       |      ✅       |       ✅        |  👁️ read  |  👁️ eigene  |
-| Zählerstände erfassen  |       ✅       |      ✅       |       ✅        |    ✅     | ✅ (eigene) |
-| Nebenkostenabrechnung  |       ✅       |      ✅       |       ✅        |    ❌     |  👁️ eigene  |
-| Mieter verwalten       |       ✅       |      ✅       |       ✅        |    ❌     |     ❌      |
-
----
-
-## Begriffsdefinitionen
-
-| Begriff               | Definition                                                                                                                                                              |
-| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Mandant**           | Organisationseinheit auf der Plattform (Kunde). Entspricht einem Unternehmen oder einer Privatperson als Vermieter.                                                     |
-| **MandantUser**       | Login-fähiger Benutzer, der zu einem Mandanten gehört. Hat eine Rolle innerhalb des Mandanten.                                                                          |
-| **Caretaker**         | Hausmeister. Gehört zu einem Dienstleister-Mandanten, hat aber delegierten Zugang zu Objekten anderer Mandanten.                                                        |
-| **Mieter** (`Renter`) | Person, die eine Wohneinheit gemietet hat. Kann (optional) einen Keycloak-Account haben für Self-Service. Bewusste Abgrenzung von `Tenant` (= Mandant in SaaS-Kontext). |
-| **MandantAccess**     | Delegierter, eingeschränkter Zugang eines Mandanten zu Objekten eines anderen Mandanten.                                                                                |
-| **Property**          | Immobilie (Gebäude). Gehört zu einem Mandanten.                                                                                                                         |
-| **Unit**              | Mieteinheit innerhalb einer Immobilie (Wohnung, Gewerbeeinheit).                                                                                                        |
+Hinweis: Detailregeln sind in den API-Dependencies und Route-Guards umgesetzt (z. B. `require_admin_manager`, `require_landlord_or_caretaker`).

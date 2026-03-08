@@ -80,6 +80,7 @@ Create sample users for all app roles:
 - `SUPER_ADMIN`
 - `ADMIN`
 - `OPERATOR`
+- `CARETAKER`
 - `LANDLORD`
 - `TENANT`
 
@@ -94,6 +95,7 @@ Default demo credentials:
 - `SUPER_ADMIN`: `super-admin@example.com` / `SuperAdminTest2026`
 - `ADMIN`: `test-admin@example.com` / `AdminTest2026`
 - `OPERATOR`: `test-operator@example.com` / `OperatorTest2026`
+- `CARETAKER`: `hausverwalter@example.com` / `HausverwalterTest2026`
 - `LANDLORD`: `demo-landlord@example.com` / `LandlordTest2026`
 - `TENANT`: `demo-tenant@example.com` / `TenantTest2026`
 
@@ -102,8 +104,43 @@ Default demo credentials:
 - `SUPER_ADMIN`: may manage `SUPER_ADMIN`, `ADMIN`, `OPERATOR`
 - `ADMIN`: may manage `ADMIN` and `OPERATOR`
 - `OPERATOR`: may manage landlord tenants only (no admin user management)
+- `CARETAKER`: has landlord-area access (`/landlord/*`) to assigned buildings/apartments
 - `LANDLORD`: landlord area
 - `TENANT`: tenant area
+
+## Domain Structure (Building and Apartment)
+
+The platform now models real estate in two explicit layers:
+
+- `Building` (`Property` in DB/API compatibility layer): physical building object
+- `Apartment` (`Unit` in DB/API compatibility layer): rentable unit inside a building
+
+Compatibility:
+
+- Existing `/landlord/properties` and `/landlord/properties/{id}/units` endpoints remain available.
+- New semantic aliases are available as well:
+  - `/landlord/buildings`
+  - `/landlord/buildings/{building_id}/apartments`
+
+### Multiple tenants per apartment (WG / shared flats)
+
+An apartment can have multiple tenants via multiple contracts, e.g. one contract per person.
+
+- `Contract` references `unit_id` (apartment) and `tenant_id`.
+- There is no one-tenant-only constraint on apartments.
+- This allows parallel and/or overlapping individual contracts for shared living scenarios.
+
+### Caretaker assignment model
+
+Caretakers can be assigned either:
+
+- to a whole building (`caretaker_building_assignments`), or
+- to a specific apartment (`caretaker_apartment_assignments`).
+
+Landlords/Admins can manage assignments via landlord API endpoints:
+
+- `POST/DELETE /landlord/buildings/{building_id}/caretakers/{caretaker_id}`
+- `POST/DELETE /landlord/apartments/{apartment_id}/caretakers/{caretaker_id}`
 
 ## Backend Local Development (without Compose)
 

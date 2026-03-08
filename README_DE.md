@@ -80,6 +80,7 @@ Demo-User fuer alle Rollen anlegen:
 - `SUPER_ADMIN`
 - `ADMIN`
 - `OPERATOR`
+- `CARETAKER`
 - `LANDLORD`
 - `TENANT`
 
@@ -94,6 +95,7 @@ Standard-Demo-Credentials:
 - `SUPER_ADMIN`: `super-admin@example.com` / `SuperAdminTest2026`
 - `ADMIN`: `test-admin@example.com` / `AdminTest2026`
 - `OPERATOR`: `test-operator@example.com` / `OperatorTest2026`
+- `CARETAKER`: `hausverwalter@example.com` / `HausverwalterTest2026`
 - `LANDLORD`: `demo-landlord@example.com` / `LandlordTest2026`
 - `TENANT`: `demo-tenant@example.com` / `TenantTest2026`
 
@@ -102,8 +104,43 @@ Standard-Demo-Credentials:
 - `SUPER_ADMIN`: darf `SUPER_ADMIN`, `ADMIN`, `OPERATOR` verwalten
 - `ADMIN`: darf `ADMIN` und `OPERATOR` verwalten
 - `OPERATOR`: darf nur Vermieter/Mandanten verwalten (keine Admin-Benutzerverwaltung)
+- `CARETAKER`: hat Zugriff auf den Vermieter-Bereich (`/landlord/*`) fuer zugewiesene Gebaeude/Wohnungen
 - `LANDLORD`: Vermieter-Bereich
 - `TENANT`: Mieter-Bereich
+
+## Fachliche Struktur (Gebaeude und Wohnung)
+
+Die Datenstruktur modelliert Immobilien jetzt explizit in zwei Ebenen:
+
+- `Gebaeude` (`Property` in DB/API-Kompatibilitaet)
+- `Wohnung` (`Unit` in DB/API-Kompatibilitaet)
+
+Kompatibilitaet:
+
+- Vorhandene Endpunkte `/landlord/properties` und `/landlord/properties/{id}/units` bleiben erhalten.
+- Neue semantische Alias-Endpunkte sind ebenfalls vorhanden:
+  - `/landlord/buildings`
+  - `/landlord/buildings/{building_id}/apartments`
+
+### Mehrere Mieter pro Wohnung (WG / Einzelmietvertraege)
+
+Eine Wohnung kann mehrere Mieter haben, indem mehrere Vertraege auf dieselbe Wohnung verweisen
+(z. B. WG mit Einzelmietvertraegen).
+
+- `Contract` referenziert `unit_id` (Wohnung) und `tenant_id`.
+- Es gibt keine Ein-Mieter-pro-Wohnung-Restriktion.
+
+### Hausverwalter-Zuweisungen
+
+Hausverwalter koennen zugewiesen werden auf:
+
+- ein gesamtes Gebaeude (`caretaker_building_assignments`), oder
+- eine einzelne Wohnung (`caretaker_apartment_assignments`).
+
+Zuweisungs-Endpunkte (durch Vermieter/Admin):
+
+- `POST/DELETE /landlord/buildings/{building_id}/caretakers/{caretaker_id}`
+- `POST/DELETE /landlord/apartments/{apartment_id}/caretakers/{caretaker_id}`
 
 ## Backend lokale Entwicklung (ohne Compose)
 
