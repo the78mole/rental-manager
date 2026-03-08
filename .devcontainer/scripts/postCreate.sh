@@ -53,3 +53,9 @@ echo ""
 echo "To start the frontend dev server instead:"
 echo "    cd frontend && npm run dev"
 echo ""
+
+# ── 4. ZSH-Theme setzen ──────────────────────────────────────────────────────
+if [[ -f ~/.zshrc ]]; then
+  sed -i 's/^ZSH_THEME=.*/ZSH_THEME="fino"/' ~/.zshrc
+  echo "✅  ZSH-Theme auf 'fino' gesetzt"
+fi

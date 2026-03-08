@@ -30,6 +30,7 @@
       "ohMyZsh": true,
       "zshAutosuggestions": true,
       "zshSyntaxHighlighting": true,
+      "configureZshAsDefaultShell": true,
       "username": "vscode",
       "userUid": "automatic",
       "userGid": "automatic"
@@ -53,7 +54,7 @@
   // Without this, a newer Docker CLI (e.g. 1.52) is rejected by an older
   // daemon (e.g. Engine 23.x, API 1.43) with "client version too new".
   "remoteEnv": {
-    "DOCKER_API_VERSION": "1.43"
+    "DOCKER_API_VERSION": "1.50"
   },
 
   // ── Port forwarding ─────────────────────────────────────────────────────────
@@ -96,9 +97,6 @@
         "bierner.markdown-mermaid"
       ],
       "settings": {
-        // Point VS Code to the backend virtual-env created in postCreate.sh
-        "python.defaultInterpreterPath": "${workspaceFolder}/backend/.venv/bin/python",
-        "python.terminal.activateEnvironment": true,
         "editor.formatOnSave": true,
         "[python]": {
           "editor.defaultFormatter": "ms-python.python"

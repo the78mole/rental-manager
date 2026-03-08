@@ -1,5 +1,7 @@
 # rental-manager
 
+[![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-blue?logo=github)](https://the78mole.github.io/rental-manager/)
+
 Web application for rental management (landlords, tenants, contracts, utility billing) with:
 
 - FastAPI backend
@@ -27,35 +29,40 @@ What it does:
 
 ### 1. Start the full stack
 
-Run from repository root:
+> **Note:** Do not use `docker compose up -d --build` directly. Keycloak requires its
+> PostgreSQL database to exist before startup, and Docker API ≥ 1.44 is required for
+> containers with multiple network endpoints. The setup script handles both automatically.
+
+The setup script is the only supported way to start the stack from scratch:
 
 ```bash
-docker compose up -d --build
+./scripts/setup-stack.sh --with-demo-accounts
 ```
 
-Check status:
+Check status afterwards:
 
 ```bash
 docker compose ps
 ```
 
-Expected: `db`, `redis`, `rustfs`, `step-ca`, `keycloak` become `healthy`; `api`, `web`, `caddy`, `worker`, `beat` are `Up`.
+Expected: `db`, `redis`, `rustfs`, `step-ca`, `keycloak` are `healthy`; `api`, `web`, `caddy`, `worker`, `beat` are `Up`.
 
-### 2. Recovery steps if initial startup is incomplete
+### 2. Recovery / individual service restart
 
-If `api` or `caddy` are stuck in `Created`:
-
-```bash
-docker compose up -d api caddy
-```
-
-If `keycloak` is unhealthy and logs show `database "keycloak" does not exist`:
+Restart a single service:
 
 ```bash
-./scripts/setup-stack.sh
+docker compose restart <service>
 ```
 
-If you changed `keycloak/rental-realm.json`, rebuild Keycloak image:
+Full teardown and clean restart:
+
+```bash
+docker compose down -v --remove-orphans
+./scripts/setup-stack.sh --with-demo-accounts
+```
+
+If you changed `keycloak/rental-realm.json`, rebuild the Keycloak image:
 
 ```bash
 docker compose up -d --build keycloak
@@ -141,6 +148,28 @@ Landlords/Admins can manage assignments via landlord API endpoints:
 
 - `POST/DELETE /landlord/buildings/{building_id}/caretakers/{caretaker_id}`
 - `POST/DELETE /landlord/apartments/{apartment_id}/caretakers/{caretaker_id}`
+
+## Dev Container (VS Code / GitHub Codespaces)
+
+The repository ships a fully configured dev container (`.devcontainer/`).
+
+| Setting             | Value                                                         |
+| ------------------- | ------------------------------------------------------------- |
+| Base image          | `mcr.microsoft.com/devcontainers/base:ubuntu-24.04`           |
+| Default shell       | ZSH with oh-my-zsh, theme **fino**                            |
+| Docker              | Docker-outside-of-Docker (shares host socket)                 |
+| Required Docker API | **1.50** (set automatically in devcontainer and setup script) |
+
+Lifecycle scripts:
+
+- **`postCreate.sh`** – runs once on container create: copies `.env.example → .env`, installs Python venv (`uv sync`), installs npm packages, sets ZSH theme to `fino`.
+- **`postStart.sh`** – runs on every container start.
+
+After the devcontainer starts, run the stack setup from the integrated terminal:
+
+```bash
+bash scripts/setup-stack.sh --with-demo-accounts
+```
 
 ## Backend Local Development (without Compose)
 
